@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Block Builder</title>
+    
+    <!-- CSS Imports -->
+    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="components.css">
+    <link rel="stylesheet" href="toolbar.css">
+    <link rel="stylesheet" href="chat.css">
+    <link rel="stylesheet" href="modals.css">
+    
+    <!-- Import Map for CDN dependencies -->
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://esm.sh/three@0.160.0",
+        "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/",
+        "nipplejs": "https://esm.sh/nipplejs@0.10.1"
+      }
+    }
+    </script>
+</head>
+<body>
+    <!-- 3D Canvas Container -->
+    <div id="canvas-container"></div>
+    
+    <!-- Main UI Overlay -->
+    <div id="ui-overlay">
+        <!-- Top Toolbar -->
+        <div id="toolbar" class="toolbar">
+            <div class="toolbar-section">
+                <button id="tool-select" class="tool-btn active" data-tool="select" title="Select Tool (Q)">
+                    <span class="tool-icon">↖</span>
+                </button>
+                <button id="tool-block" class="tool-btn" data-tool="block" title="Block Tool (W)">
+                    <span class="tool-icon">◼</span>
+                </button>
+                <button id="tool-asset" class="tool-btn" data-tool="asset" title="Asset Tool (E)">
+                    <span class="tool-icon">★</span>
+                </button>
+                <button id="tool-texture" class="tool-btn" data-tool="texture" title="Texture Tool (R)">
+                    <span class="tool-icon">🎨</span>
+                </button>
+            </div>
+            
+            <div class="toolbar-section">
+                <button id="undo-btn" class="toolbar-btn" title="Undo (Ctrl+Z)">↶</button>
+                <button id="redo-btn" class="toolbar-btn" title="Redo (Ctrl+Y)">↷</button>
+            </div>
+            
+            <div class="toolbar-section">
+                <button id="grid-toggle" class="toolbar-btn active" title="Toggle Grid (G)">Grid</button>
+                <button id="save-btn" class="toolbar-btn" title="Save (Ctrl+S)">Save</button>
+                <button id="load-btn" class="toolbar-btn" title="Load">Load</button>
+            </div>
+        </div>
+        
+        <!-- Block Panel (Hidden by default) -->
+        <div id="block-panel" class="panel hidden">
+            <h3>Block Options</h3>
+            <div class="panel-content">
+                <div class="size-controls">
+                    <label>Width: <input type="number" id="block-width" value="1" min="0.1" step="0.1"></label>
+                    <label>Height: <input type="number" id="block-height" value="1" min="0.1" step="0.1"></label>
+                    <label>Depth: <input type="number" id="block-depth" value="1" min="0.1" step="0.1"></label>
+                </div>
+                <div class="color-controls">
+                    <label>Color: <input type="color" id="block-color" value="#ffffff"></label>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Asset Panel (Hidden by default) -->
+        <div id="asset-panel" class="panel hidden">
+            <h3>Asset Library</h3>
+            <div class="panel-content">
+                <div id="asset-list" class="asset-grid"></div>
+            </div>
+        </div>
+        
+        <!-- Texture Panel (Hidden by default) -->
+        <div id="texture-panel" class="panel hidden">
+            <h3>Texture Options</h3>
+            <div class="panel-content">
+                <div class="texture-controls">
+                    <button id="generate-texture-btn" class="btn-primary">Generate Texture</button>
+                    <button id="upload-texture-btn" class="btn-secondary">Upload Texture</button>
+                    <input type="file" id="texture-file-input" accept="image/*" style="display: none;">
+                </div>
+                <div id="texture-list" class="texture-grid"></div>
+            </div>
+        </div>
+        
+        <!-- Properties Panel (for selected objects) -->
+        <div id="properties-panel" class="panel hidden">
+            <h3>Properties</h3>
+            <div class="panel-content">
+                <div id="properties-content"></div>
+            </div>
+        </div>
+        
+        <!-- Chat Interface -->
+        <div id="chat-container" class="chat-container collapsed">
+            <div class="chat-header">
+                <span>AI Assistant</span>
+                <button id="chat-toggle" class="chat-toggle-btn">−</button>
+            </div>
+            <div class="chat-messages" id="chat-messages"></div>
+            <div class="chat-input-container">
+                <input type="text" id="chat-input" class="chat-input" placeholder="Ask AI to modify the scene...">
+                <button id="chat-send" class="chat-send-btn">Send</button>
+            </div>
+        </div>
+        
+        <!-- History Panel -->
+        <div id="history-panel" class="panel collapsed">
+            <div class="panel-header">
+                <h3>History</h3>
+                <button id="history-toggle" class="panel-toggle-btn">−</button>
+            </div>
+            <div class="panel-content">
+                <div id="history-list" class="history-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div id="texture-generate-modal" class="modal hidden">
+            <div class="modal-header">
+                <h2>Generate Texture</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="texture-prompt">Describe the texture:</label>
+                <input type="text" id="texture-prompt" class="modal-input" placeholder="e.g., brick wall, wood planks, grass">
+                <div class="modal-actions">
+                    <button id="texture-generate-confirm" class="btn-primary">Generate</button>
+                    <button class="modal-cancel btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
+        <div id="save-modal" class="modal hidden">
+            <div class="modal-header">
+                <h2>Save Level</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <label for="save-filename">Filename:</label>
+                <input type="text" id="save-filename" class="modal-input" placeholder="my-level.json">
+                <div class="modal-actions">
+                    <button id="save-confirm" class="btn-primary">Save</button>
+                    <button class="modal-cancel btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading indicator -->
+    <div id="loading-indicator" class="loading-indicator hidden">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+    </div>
+    
+    <!-- Application Entry Point -->
+    <script type="module" src="init.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
+
